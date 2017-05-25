@@ -1,2 +1,4 @@
 __pycache__/
-.ipynb_checkpoints
+.ipynb_checkpoints/
+.idea/
+explore-apis/my_api_keys.py
