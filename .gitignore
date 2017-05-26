@@ -1,4 +1,5 @@
 __pycache__/
 .ipynb_checkpoints/
 .idea/
-explore-apis/my_api_keys.py
+my_api_keys.py
+data_gov_sg_met_v1/
