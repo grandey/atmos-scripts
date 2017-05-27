@@ -65,32 +65,45 @@ def retrieve_data_via_api(variable, dt, n_attempts=10):
     Returns:
         pd.DataFrame containing data (if successful), or None
     """
-    r = requests.get('https://api.data.gov.sg/v1/environment/{}'.format(variable),
-                     headers={'api-key': my_key},
-                     params={'date_time': dt.strftime('%Y-%m-%dT%H:%M:%S')})
-    if r.status_code == 200:
-        # If API connection was successful, load data into DataFrame, unless no data present
-        if len(r.json()['items'][0]['readings']) >= 1:
-            result = pd.DataFrame(r.json()['items'][0]['readings'])
-            if variable == 'pm25':  # necessary due to diff in pm25 API return format
-                result = result.reset_index()
-                result = result.rename(columns={'index': 'region'})
-            result['timestamp_sgt'] = pd.to_datetime(r.json()['items'][0]['timestamp'].split('+')
-                                                     [0])
+    try:
+        # Try to connect to API
+        r = requests.get('https://api.data.gov.sg/v1/environment/{}'.format(variable),
+                         headers={'api-key': my_key},
+                         params={'date_time': dt.strftime('%Y-%m-%dT%H:%M:%S')})
+        if r.status_code == 200:
+            # If API connection was successful, load data into DataFrame, unless no data present
+            if len(r.json()['items'][0]['readings']) >= 1:
+                result = pd.DataFrame(r.json()['items'][0]['readings'])
+                if variable == 'pm25':  # necessary due to diff in pm25 API return format
+                    result = result.reset_index()
+                    result = result.rename(columns={'index': 'region'})
+                result['timestamp_sgt'] = pd.to_datetime(r.json()['items'][0]['timestamp']
+                                                         .split('+')[0])
+            else:
+                result = None
         else:
-            result = None
-    else:
-        # If API connection failed, sleep a few seconds, then retry recursively (up to n_attempts)
+            # If API query failed, sleep one minute, then retry recursively (up to n_attempts)
+            if n_attempts > 1:
+                print('    dt = {}, r.status_code = {}, (n_attempts-1) = {}. '
+                      'Retrying in 60s.'.format(dt, r.status_code, (n_attempts-1)))
+                time.sleep(60)
+                result = retrieve_data_via_api(variable, dt, n_attempts=(n_attempts-1))
+            else:
+                print('    dt = {}, r.status_code = {}, (n_attempts-1) = {}. '
+                      'FAILED TO RETRIEVE DATA.'.format(dt, r.status_code, (n_attempts-1)))
+                result = None
+        r.close()
+    except (requests.exceptions.SSLError, requests.exceptions.ConnectionError):
+        # If connection failed, sleep one minute, then retry recursively (up to n_attempts)
         if n_attempts > 1:
-            print('    dt = {}, r.status_code = {}, (n_attempts-1) = {}. '
-                  'Retrying in 10s.'.format(dt, r.status_code, (n_attempts-1)))
-            time.sleep(10)
+            print('    dt = {}, error = {}, (n_attempts-1) = {}. '
+                  'Retrying in 60s.'.format(dt, sys.exc_info()[0], (n_attempts-1)))
+            time.sleep(60)
             result = retrieve_data_via_api(variable, dt, n_attempts=(n_attempts-1))
         else:
-            print('    dt = {}, r.status_code = {}, (n_attempts-1) = {}. '
-                  'FAILED TO RETRIEVE DATA.'.format(dt, r.status_code, (n_attempts-1)))
+            print('    dt = {}, error = {}, (n_attempts-1) = {}. '
+                  'FAILED TO CONNECT.'.format(dt, sys.exc_info()[0], (n_attempts-1)))
             result = None
-    r.close()
     return result
 
 
@@ -110,7 +123,7 @@ def download_month(variable, yyyy, mm):
     """
     print('variable = {}, yyyy = {}, mm = {}'.format(variable, yyyy, mm))
     # Number of days in month
-    ndays = calendar.monthrange(int(yyyy), int(mm))[1]  # support leap years
+    ndays = calendar.monthrange(int(yyyy), int(mm))[1]  # supports leap years
     # Datetime range to search through - at 5-min intervals
     datetime_range = pd.date_range('{}-{}-01 00:00:00'.format(yyyy, mm),
                                    periods=((ndays * 24 * 12) + 1),
@@ -132,6 +145,9 @@ def download_month(variable, yyyy, mm):
     print()  # start new line
     # Print summary of number of records
     print('    {} records'.format(len(df)))
+    # Remove duplicates
+    df = df.drop_duplicates()
+    print('    {} records after removing duplicates'.format(len(df)))
     # Save DataFrame to CSV file
     out_filename = '{}/{}_{}_{}_c{}.csv'.format(data_dir, variable, yyyy, mm,
                                                 pd.datetime.today().strftime('%Y%m%d'))
