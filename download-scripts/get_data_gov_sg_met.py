@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 get_data_gov_sg_met.py:
@@ -13,12 +13,12 @@ Usage:
         0 0 2 * * tar -zcf <path_to_here>/get_data_gov_sg_met.py
     
 Output files:
-    CSV files, corresponding to different variables, will be saved in data_gov_sg_met_v1/
+    Gzipped CSV files, corresponding to different variables, will be saved in data_gov_sg_met_v1/
     The file naming convention is as follows:
-        data_gov_sg_met_v1/<variable>_<yyyy-mm>_c<today>.csv
+        data_gov_sg_met_v1/<variable>_<yyyy-mm>_c<today>.csv.gz
     where <today> is the date on which the file was created.
     For example,
-        data_gov_sg_met_v1/wind-speed_2017-02_c20170526140800.csv
+        data_gov_sg_met_v1/wind-speed_2017-02_c20170526140800.csv.gz
     
 Information about data:
     For information about the input data used to derive these output CSV files, please see
@@ -149,9 +149,9 @@ def download_month(variable, yyyy, mm):
     df = df.drop_duplicates()
     print('    {} records after removing duplicates'.format(len(df)))
     # Save DataFrame to CSV file
-    out_filename = '{}/{}_{}_{}_c{}.csv'.format(data_dir, variable, yyyy, mm,
-                                                pd.datetime.today().strftime('%Y%m%d'))
-    df.to_csv(out_filename, index=False)
+    out_filename = '{}/{}_{}_{}_c{}.csv.gz'.format(data_dir, variable, yyyy, mm,
+                                                   pd.datetime.today().strftime('%Y%m%d'))
+    df.to_csv(out_filename, index=False, compression='gzip')
     print('    Written {}'.format(out_filename))
     return 0
 
